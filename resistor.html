@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resistor Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0e0f11;
+    --bg2: #16181c;
+    --bg3: #1e2128;
+    --border: rgba(255,255,255,.08);
+    --border2: rgba(255,255,255,.14);
+    --text: #f0ede8;
+    --text2: #8a8880;
+    --text3: #555450;
+    --accent: #e8a84c;
+    --accent2: #c07a28;
+    --glow: rgba(232,168,76,.18);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Ambient glow behind resistor */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 300px;
+    background: radial-gradient(ellipse, rgba(232,168,76,.07) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    gap: 0;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  .header h1 {
+    font-size: clamp(1.6rem, 4vw, 2.6rem);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    color: var(--text);
+  }
+  .header h1 span {
+    color: var(--accent);
+  }
+  .header p {
+    font-size: .85rem;
+    color: var(--text3);
+    margin-top: .4rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Main card */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 3rem 3rem 2.5rem;
+    width: 100%;
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+    box-shadow: 0 0 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03) inset;
+  }
+
+  /* Resistor SVG area */
+  .resistor-scene {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    height: 100px;
+  }
+
+  .lead {
+    height: 4px;
+    flex: 1;
+    background: linear-gradient(90deg, transparent, #8a7a5a, #c4ae7a, #8a7a5a, transparent);
+    border-radius: 2px;
+    max-width: 120px;
+  }
+  .lead.right {
+    background: linear-gradient(90deg, transparent, #8a7a5a, #c4ae7a, #8a7a5a, transparent);
+  }
+
+  .resistor-body {
+    width: 300px;
+    height: 80px;
+    border-radius: 36px;
+    background: linear-gradient(180deg, #e8c882 0%, #c9a255 40%, #b8913f 60%, #c9a255 100%);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 24px;
+    gap: 0;
+    flex-shrink: 0;
+    box-shadow:
+      0 4px 0 0 rgba(0,0,0,.35),
+      0 -1px 0 0 rgba(255,255,255,.25) inset,
+      0 2px 12px rgba(0,0,0,.4);
+  }
+
+  /* Sheen highlight */
+  .resistor-body::before {
+    content: '';
+    position: absolute;
+    top: 6px; left: 30px; right: 30px; height: 18px;
+    background: linear-gradient(180deg, rgba(255,255,255,.22) 0%, transparent 100%);
+    border-radius: 20px;
+    pointer-events: none;
+  }
+
+  .bands-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .band {
+    width: 26px;
+    height: 80px;
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform .13s cubic-bezier(.34,1.56,.64,1), box-shadow .13s;
+    position: relative;
+  }
+  .band::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 40%, rgba(0,0,0,.15) 100%);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+  .band:hover { transform: scaleY(1.07); box-shadow: 0 0 0 2px rgba(255,255,255,.5); }
+  .band.active {
+    transform: scaleY(1.12);
+    box-shadow: 0 0 0 3px #fff, 0 0 0 5px rgba(0,0,0,.4), 0 0 20px var(--glow);
+    z-index: 2;
+  }
+
+  .band-spacer { flex: 1; }
+  .band-spacer.narrow { flex: 0.6; }
+  .band-spacer.wide { flex: 2.2; }
+
+  #band3 { width: 18px; border-radius: 4px; }
+
+  /* Ohm readout */
+  .readout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .3rem;
+  }
+  .ohm-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(2.8rem, 8vw, 4.5rem);
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -.03em;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(232,168,76,.4);
+    transition: color .15s;
+  }
+  .ohm-sub {
+    font-size: .78rem;
+    color: var(--text3);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Selector panel */
+  .selector {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .selector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .8rem;
+  }
+
+  .sel-title {
+    font-size: .72rem;
+    color: var(--text3);
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .sel-title span {
+    color: var(--accent);
+  }
+
+  .tabs {
+    display: flex;
+    gap: 5px;
+  }
+  .tab {
+    font-size: .72rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    cursor: pointer;
+    background: transparent;
+    color: var(--text2);
+    transition: all .12s;
+    letter-spacing: .04em;
+  }
+  .tab:hover { border-color: var(--accent2); color: var(--text); }
+  .tab.active {
+    background: var(--accent);
+    color: #1a1000;
+    border-color: transparent;
+  }
+
+  .colors-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .color-btn {
+    height: 44px;
+    border-radius: 9px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .1s cubic-bezier(.34,1.56,.64,1), border-color .1s, box-shadow .1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .65rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    position: relative;
+    overflow: hidden;
+  }
+  .color-btn::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 50%;
+    background: rgba(255,255,255,.1);
+    border-radius: 7px 7px 0 0;
+  }
+  .color-btn:hover { transform: scale(1.08) translateY(-2px); }
+  .color-btn.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.4);
+    transform: scale(1.08) translateY(-2px);
+  }
+
+  /* Hint bar */
+  .hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .hint-item {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .72rem;
+    color: var(--text3);
+  }
+  kbd {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 2px 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: .65rem;
+    color: var(--text2);
+  }
+
+  /* Color name badge */
+  .color-name-badge {
+    font-size: .7rem;
+    color: var(--text2);
+    letter-spacing: .06em;
+    text-align: center;
+    font-weight: 600;
+    min-height: 1em;
+    transition: color .12s;
+  }
+
+  @media (max-width: 520px) {
+    .card { padding: 2rem 1.2rem 1.8rem; }
+    .resistor-body { width: 220px; height: 66px; border-radius: 28px; }
+    .band { width: 20px; height: 66px; }
+    #band3 { width: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>Resistor <span>Calculator</span></h1>
+    <p>4-band color code decoder</p>
+  </div>
+
+  <div class="card">
+    <!-- Resistor visual -->
+    <div class="resistor-scene">
+      <div class="lead"></div>
+      <div class="resistor-body" id="rbody">
+        <div class="bands-row">
+          <div class="band-spacer wide"></div>
+          <div class="band" id="band0"></div>
+          <div class="band-spacer narrow"></div>
+          <div class="band" id="band1"></div>
+          <div class="band-spacer narrow"></div>
+          <div class="band" id="band2"></div>
+          <div class="band-spacer wide"></div>
+          <div class="band" id="band3"></div>
+          <div class="band-spacer" style="flex:.5"></div>
+        </div>
+      </div>
+      <div class="lead right"></div>
+    </div>
+
+    <!-- Ohm readout -->
+    <div class="readout">
+      <div class="ohm-value"><span id="ohm-val">470</span><span style="font-size:.55em;opacity:.7;margin-left:4px">Ω</span></div>
+      <div class="ohm-sub" id="tol-disp">±5% tolerance</div>
+    </div>
+
+    <!-- Selector -->
+    <div class="selector">
+      <div class="selector-header">
+        <div class="sel-title">Editing — <span id="sel-band-name">Band 1</span></div>
+        <div class="tabs">
+          <button class="tab active" onclick="selectBand(0)">B1</button>
+          <button class="tab" onclick="selectBand(1)">B2</button>
+          <button class="tab" onclick="selectBand(2)">×Mult</button>
+          <button class="tab" onclick="selectBand(3)">Tol</button>
+        </div>
+      </div>
+
+      <div id="color-name-badge" class="color-name-badge">Yellow</div>
+      <div class="colors-grid" id="colors-grid"></div>
+
+      <div class="hint">
+        <div class="hint-item"><kbd>↑</kbd><kbd>↓</kbd> cycle colors</div>
+        <div class="hint-item"><kbd>Enter</kbd><kbd>→</kbd> next band</div>
+        <div class="hint-item"><kbd>←</kbd> prev band</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS=[
+  {n:'Black', bg:'#1a1a1a',fg:'#fff',val:0,mult:1},
+  {n:'Brown', bg:'#7B3F00',fg:'#fff',val:1,mult:10,   tol:'±1%'},
+  {n:'Red',   bg:'#C0392B',fg:'#fff',val:2,mult:100,  tol:'±2%'},
+  {n:'Orange',bg:'#E67E22',fg:'#fff',val:3,mult:1e3},
+  {n:'Yellow',bg:'#F4C430',fg:'#222',val:4,mult:1e4},
+  {n:'Green', bg:'#27AE60',fg:'#fff',val:5,mult:1e5,  tol:'±0.5%'},
+  {n:'Blue',  bg:'#2980B9',fg:'#fff',val:6,mult:1e6,  tol:'±0.25%'},
+  {n:'Violet',bg:'#8E44AD',fg:'#fff',val:7,mult:1e7,  tol:'±0.1%'},
+  {n:'Grey',  bg:'#95A5A6',fg:'#222',val:8,           tol:'±0.05%'},
+  {n:'White', bg:'#ECF0F1',fg:'#222',val:9},
+];
+const TOL=[
+  {n:'Gold',  bg:'#C9A84C',fg:'#222',tol:'±5%'},
+  {n:'Silver',bg:'#BDC3C7',fg:'#222',tol:'±10%'},
+  {n:'Brown', bg:'#7B3F00',fg:'#fff',tol:'±1%'},
+  {n:'Red',   bg:'#C0392B',fg:'#fff',tol:'±2%'},
+  {n:'Green', bg:'#27AE60',fg:'#fff',tol:'±0.5%'},
+  {n:'Blue',  bg:'#2980B9',fg:'#fff',tol:'±0.25%'},
+  {n:'Violet',bg:'#8E44AD',fg:'#fff',tol:'±0.1%'},
+  {n:'Grey',  bg:'#95A5A6',fg:'#222',tol:'±0.05%'},
+];
+
+let bands=[4,7,1,0];
+let activeBand=0;
+
+function getList(){
+  if(activeBand===3) return TOL;
+  if(activeBand===2) return COLORS.filter(c=>c.mult!=null);
+  return COLORS;
+}
+
+function formatOhm(v){
+  if(v>=1e9) return (v/1e9).toFixed(v%1e9===0?0:2)+'G';
+  if(v>=1e6) return (v/1e6).toFixed(v%1e6===0?0:2)+'M';
+  if(v>=1e3) return (v/1e3).toFixed(v%1e3===0?0:1)+'k';
+  return String(v);
+}
+function calcOhm(){
+  const c1=COLORS[bands[0]], c2=COLORS[bands[1]];
+  const mult = COLORS[bands[2]].mult;
+  if(!mult && mult!==1) return '?';
+  return formatOhm((c1.val*10+c2.val)*mult);
+}
+function getTol(){ return TOL[bands[3]].tol; }
+function getBandBg(i){ return i<3?COLORS[bands[i]].bg:TOL[bands[3]].bg; }
+function getCurrentColorName(){
+  const list=getList();
+  return list[bands[activeBand]]?.n || '';
+}
+
+function renderBands(){
+  for(let i=0;i<4;i++){
+    const el=document.getElementById('band'+i);
+    el.style.background=getBandBg(i);
+    el.classList.toggle('active',i===activeBand);
+  }
+}
+function selectBand(i){ activeBand=i; renderAll(); }
+
+function renderTabs(){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===activeBand));
+  const names=['Band 1','Band 2','Multiplier','Tolerance'];
+  document.getElementById('sel-band-name').textContent=names[activeBand];
+}
+
+function renderSelector(){
+  const grid=document.getElementById('colors-grid');
+  grid.innerHTML='';
+  const list=getList();
+  list.forEach((c,i)=>{
+    const btn=document.createElement('div');
+    btn.className='color-btn'+(bands[activeBand]===i?' selected':'');
+    btn.style.background=c.bg;
+    btn.style.color=c.fg;
+    btn.textContent=c.n.slice(0,3).toUpperCase();
+    btn.title=c.n;
+    btn.onclick=()=>{bands[activeBand]=i; renderAll();};
+    grid.appendChild(btn);
+  });
+  document.getElementById('color-name-badge').textContent=getCurrentColorName();
+}
+
+function renderAll(){
+  renderBands();
+  renderSelector();
+  renderTabs();
+  document.getElementById('ohm-val').textContent=calcOhm();
+  document.getElementById('tol-disp').textContent=getTol()+' tolerance';
+}
+
+for(let i=0;i<4;i++) document.getElementById('band'+i).onclick=()=>selectBand(i);
+
+document.addEventListener('keydown',e=>{
+  const list=getList();
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    bands[activeBand]=(bands[activeBand]+1)%list.length;
+    renderAll();
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    bands[activeBand]=(bands[activeBand]-1+list.length)%list.length;
+    renderAll();
+  } else if(e.key==='Enter'||e.key==='ArrowRight'){
+    e.preventDefault();
+    activeBand=(activeBand+1)%4;
+    renderAll();
+  } else if(e.key==='ArrowLeft'){
+    e.preventDefault();
+    activeBand=(activeBand+3)%4;
+    renderAll();
+  }
+});
+
+renderAll();
+</script>
+</body>
+</html>
